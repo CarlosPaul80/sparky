@@ -1,20 +1,23 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
 
+// Importar rutas
 const authRoutes = require('./routes/authRoutes');
 
-const app = express();
+// Inicializar aplicación
+const server = express();
 
-// Middlewares
-app.use(cors());
-app.use(express.json()); // Para entender JSON
+// Configuraciones globales
+server.use(express.json()); // Habilitar lectura de JSON
+server.use(cors());         // Habilitar CORS
 
-// Rutas
-app.use('/api/auth', authRoutes);
+// Rutas principales
+server.use('/api/auth', authRoutes);
 
-// Iniciar servidor
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Servidor Stock360 corriendo en puerto ${PORT}`);
+// Arranque del servidor
+const SERVER_PORT = process.env.PORT || 3000;
+
+server.listen(SERVER_PORT, () => {
+    console.log(`--- Servidor Sparky activo en puerto: ${SERVER_PORT} ---`);
 });

@@ -1,8 +1,10 @@
-const express = require('express');
-const router = express.Router();
-const authController = require('../controllers/authController');
+const { Router } = require('express');
+const UserCtrl = require('../controllers/authController');
 
-router.post('/register', authController.register);
-router.post('/login', authController.login);
+const apiRouter = Router();
 
-module.exports = router;
+// Definición de rutas
+apiRouter.post('/register', UserCtrl.register);
+apiRouter.post('/login', UserCtrl.login);
+
+module.exports = apiRouter;

@@ -1,16 +1,18 @@
-const { Pool } = require('pg'); // <--- ¡ESTA ES LA LÍNEA QUE TE FALTABA!
+const pg = require('pg');
 require('dotenv').config();
 
-const pool = new Pool({
+const dbConfig = {
     user: process.env.DB_USER,
     host: process.env.DB_HOST,
-    database: process.env.DB_NAME, // Aquí tomará 'sparky_db' de tu .env
+    database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
+};
+
+const database = new pg.Pool(dbConfig);
+
+database.on('connect', () => {
+    console.log('>>> DB Conectada: Sparky está en línea');
 });
 
-pool.on('connect', () => {
-    console.log('Conectado exitosamente a PostgreSQL (Sparky)');
-});
-
-module.exports = pool;
+module.exports = database;

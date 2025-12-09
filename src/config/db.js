@@ -1,14 +1,15 @@
 const pg = require('pg');
 require('dotenv').config();
 
-// MIRA AQUI: Esto le dice al codigo: "Si existe una URL de Railway, usala. Si no, usa mis datos locales"
+// MIRA ESTO: Aquí le decimos que si existe la variable de Railway, la use.
+// Si no existe, usa las tuyas locales.
 const connectionString = process.env.DATABASE_URL 
     ? process.env.DATABASE_URL 
     : `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`;
 
 const database = new pg.Pool({
     connectionString: connectionString,
-    // IMPORTANTE: Railway necesita SSL (seguridad), tu compu no. Esto lo arregla automatico.
+    // CRUCIAL: Railway exige conexión segura (SSL), tu PC no. Esto lo arregla.
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 

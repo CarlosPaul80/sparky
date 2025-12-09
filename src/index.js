@@ -1,23 +1,22 @@
-require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
+const cors = require('cors'); // <--- IMPORTANTE: Importar cors
+require('dotenv').config();
+// Importa tus rutas (asegúrate que la ruta sea correcta según tu carpeta)
+const authRoutes = require('./routes/authRoutes'); 
 
-// Importar rutas
-const authRoutes = require('./routes/authRoutes');
+const app = express();
 
-// Inicializar aplicación
-const server = express();
+// 1. HABILITAR CORS: Esto permite que el Frontend hable con el Backend
+app.use(cors()); 
 
-// Configuraciones globales
-server.use(express.json()); // Habilitar lectura de JSON
-server.use(cors());         // Habilitar CORS
+app.use(express.json());
 
-// Rutas principales
-server.use('/api/auth', authRoutes);
+// Tus rutas
+app.use('/api/auth', authRoutes); // O la ruta que estés usando
 
-// Arranque del servidor
-const SERVER_PORT = process.env.PORT || 3000;
+// 2. PUERTO DINÁMICO: Railway te asigna un puerto al azar en process.env.PORT
+const PORT = process.env.PORT || 3000; 
 
-server.listen(SERVER_PORT, () => {
-    console.log(`--- Servidor Sparky activo en puerto: ${SERVER_PORT} ---`);
+app.listen(PORT, '0.0.0.0', () => { // '0.0.0.0' es necesario para Docker/Railway
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
 });

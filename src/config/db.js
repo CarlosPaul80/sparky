@@ -1,16 +1,16 @@
 const pg = require('pg');
 require('dotenv').config();
 
-// ESTA ES LA CLAVE: 
-// Detectamos si existe la variable DATABASE_URL (Railway)
-const connectionString = process.env.DATABASE_URL 
-    ? process.env.DATABASE_URL 
-    : `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`;
+// Si el host es localhost, no usa SSL. Si es Railway, SÍ usa SSL.
+const isProduction = process.env.DB_HOST !== 'localhost';
 
 const database = new pg.Pool({
-    connectionString: connectionString,
-    // Railway EXIGE esto (SSL), si no lo pones, rechaza la conexión
-    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT,
+    ssl: isProduction ? { rejectUnauthorized: false } : false
 });
 
 database.on('connect', () => {

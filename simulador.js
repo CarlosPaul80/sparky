@@ -1,46 +1,46 @@
-// simulador.js
-// Este script finge ser el ESP32
-const API_URL = 'http://localhost:3000/api/solar/log';
+const axios = require('axios'); // Asegúrate de tener axios instalado (npm install axios)
+// Si no quieres usar axios, avísame para hacerlo con 'fetch' nativo (Node 18+)
 
-console.log('📡 INICIANDO SIMULADOR DE PANEL SOLAR S.P.A.R.K.Y...');
-console.log('Presiona Ctrl + C para detenerlo.');
+// CONFIGURACIÓN: Debe coincidir con tu backend
+const API_URL = 'http://localhost:3000/api/solar/log'; 
 
-async function enviarDato() {
-    // Generamos datos aleatorios realistas
-    const voltaje = (11.5 + Math.random() * 2.5).toFixed(2); // Entre 11.5V y 14.0V
-    const corriente = (0.5 + Math.random() * 3.0).toFixed(2); // Entre 0.5A y 3.5A
-    const temperatura = (25 + Math.random() * 15).toFixed(2); // Entre 25°C y 40°C (A veces alerta)
-    
-    // Lógica simple de batería basada en voltaje
-    let bateria = Math.floor(((voltaje - 11.5) / 2.5) * 100);
-    if(bateria > 100) bateria = 100;
-    if(bateria < 0) bateria = 0;
+console.log('--- INICIANDO SIMULADOR DE PANEL SOLAR (SPARKY) ---');
+console.log(`📡 Enviando datos a: ${API_URL}`);
+console.log('---------------------------------------------------');
 
+// Función para generar números aleatorios (simulación de sensores)
+const random = (min, max) => parseFloat((Math.random() * (max - min) + min).toFixed(2));
+
+const enviarDatos = async () => {
+    // 1. Generar datos falsos
     const datos = {
-        voltaje: parseFloat(voltaje),
-        corriente: parseFloat(corriente),
-        temperatura: parseFloat(temperatura),
-        bateria_nivel: bateria
+        voltaje: random(11.5, 14.5),      // Voltaje típico de batería 12V
+        corriente: random(0.5, 5.0),      // Amperios generados
+        temperatura: random(20, 65),      // Temperatura del panel
+        bateria_nivel: Math.floor(random(40, 100)) // Porcentaje de batería
     };
 
     try {
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(datos)
-        });
-        const json = await response.json();
+        // 2. Enviar al Backend (POST)
+        const response = await axios.post(API_URL, datos);
         
-        console.log(`[Enviado] ${voltaje}V | ${temperatura}°C | Bat: ${bateria}% -> Respuesta:`, json);
+        console.log(`✅ Enviado: ${datos.voltaje}V | ${datos.temperatura}°C -> Respuesta Server:`, response.data);
         
-        if(json.orden_apagado) {
-            console.log("⚠️ ALERTA: EL SERVIDOR ORDENA APAGAR EL SISTEMA POR TEMPERATURA ⚠️");
+        // Si el servidor nos dice que apaguemos (lógica de alerta)
+        if (response.data.orden_apagado) {
+            console.warn('⚠️ ALERTA: El servidor ordenó APAGADO DE EMERGENCIA por temperatura.');
         }
 
     } catch (error) {
-        console.error('Error conectando con el servidor:', error.message);
+        // 3. Manejo de errores (Si el backend está apagado o la URL está mal)
+        if (error.code === 'ECONNREFUSED') {
+            console.error('❌ ERROR DE CONEXIÓN: El servidor Backend parece estar apagado o en otro puerto.');
+        } else {
+            console.error(`❌ Error enviando: ${error.message}`);
+        }
     }
-}
+};
 
-// Enviar un dato cada 3 segundos
-setInterval(enviarDato, 3000);
+// Enviar datos cada 3 segundos
+setInterval(enviarDatos, 3000);
+enviarDatos(); // Ejecutar inmediatamente la primera vez

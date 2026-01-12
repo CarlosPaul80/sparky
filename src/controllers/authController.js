@@ -1,4 +1,4 @@
-const db = require('../config/db'); 
+const pool = require('../config/db'); // ✅ Importamos como 'pool'
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -9,7 +9,8 @@ const register = async (request, response) => {
         
         // 1. Verificar si el email ya existe en la tabla 'usuarios'
         const userQuery = 'SELECT * FROM usuarios WHERE email = $1';
-        const foundUser = await db.query(userQuery, [email]);
+        // CORREGIDO: Usamos pool.query en vez de db.query
+        const foundUser = await pool.query(userQuery, [email]);
 
         if (foundUser.rowCount > 0) {
             return response.status(400).json({ 
@@ -29,7 +30,8 @@ const register = async (request, response) => {
             RETURNING id, nombre, email, rol
         `;
         
-        const createdUser = await db.query(insertQuery, [nombre, email, hash]);
+        // CORREGIDO: Usamos pool.query
+        const createdUser = await pool.query(insertQuery, [nombre, email, hash]);
 
         return response.status(201).json({
             message: 'Registro completado con éxito',
@@ -49,7 +51,8 @@ const login = async (request, response) => {
 
         // 1. Buscar usuario por email en tabla 'usuarios'
         const query = 'SELECT * FROM usuarios WHERE email = $1';
-        const result = await db.query(query, [email]);
+        // CORREGIDO: Usamos pool.query
+        const result = await pool.query(query, [email]);
 
         if (result.rows.length === 0) {
             return response.status(400).json({ message: 'Datos incorrectos' });
@@ -84,7 +87,7 @@ const login = async (request, response) => {
                 id: userData.id,
                 nombre: userData.nombre,
                 email: userData.email,
-                rol: userData.rol // Angular necesita esto para saber si es Admin
+                rol: userData.rol // Angular necesita esto
             }
         });
 

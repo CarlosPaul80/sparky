@@ -1,9 +1,11 @@
-require('dotenv').config();
+require('dotenv').config(); // Asegúrate de ejecutar node desde la raíz del proyecto
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+
+// --- IMPORTACIONES ---
+const pool = require('./config/db'); 
+const sensorController = require('./controllers/sensorController');
+const authController = require('./controllers/authController');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -12,19 +14,10 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// 1. Configuración de la Base de Datos (Railway)
-const pool = new Pool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT,
-    ssl: { rejectUnauthorized: false } // Necesario para Railway
-});
-
-// 2. Inicializar la tabla automáticamente (para evitar errores)
+// --- VERIFICACIÓN DE TABLAS ---
 const initDB = async () => {
     try {
+        // Tabla de Mediciones
         await pool.query(`
             CREATE TABLE IF NOT EXISTS mediciones (
                 id SERIAL PRIMARY KEY,
@@ -35,112 +28,102 @@ const initDB = async () => {
                 fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
-        console.log('✅ Tabla "mediciones" verificada/creada en Railway.');
         
-        // Tabla de usuarios (opcional, para el login)
+        // Tabla de Usuarios
         await pool.query(`
             CREATE TABLE IF NOT EXISTS usuarios (
                 id SERIAL PRIMARY KEY,
                 nombre VARCHAR(100),
                 email VARCHAR(100) UNIQUE,
                 password VARCHAR(255),
-                role VARCHAR(20) DEFAULT 'user'
+                rol VARCHAR(20) DEFAULT 'usuario'
             );
         `);
+        console.log('✅ Tablas verificadas correctamente en la DB.');
     } catch (err) {
-        console.error('❌ Error inicializando DB:', err);
+        console.error('❌ Error inicializando Tablas:', err);
     }
 };
+
+// Ejecutamos la verificación
 initDB();
 
-// --- RUTAS DE AUTENTICACIÓN (Login básico) ---
-app.post('/api/auth/login', async (req, res) => {
-    const { email, password } = req.body;
-    // NOTA: Para pruebas rápidas, si el usuario no existe, puedes crear un "dummy login"
-    // O implementar el registro real. Aquí simulamos un admin si las credenciales coinciden con un "hardcoded" para emergencias
-    // o buscamos en DB.
-    
-    // Ejemplo simplificado: Buscar en DB
+// ==========================================
+//           RUTAS DE LA APLICACIÓN
+// ==========================================
+
+// --- 1. RUTAS DE AUTENTICACIÓN ---
+app.post('/api/auth/register', authController.register);
+app.post('/api/auth/login', authController.login);
+
+
+// --- 2. GESTIÓN DE USUARIOS (ADMIN) ---  // <--- NUEVO BLOQUE
+// Obtener todos los usuarios
+app.get('/api/users', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
-        if (result.rows.length === 0) {
-            // TRUCO: Si no hay usuarios, crea uno al vuelo para que puedas entrar (solo para desarrollo)
-            if (email === 'admin@sparky.com' && password === 'admin123') {
-               const token = jwt.sign({ id: 1, nombre: 'Admin', role: 'admin' }, process.env.JWT_SECRET);
-               return res.json({ token, user: { nombre: 'Admin', role: 'admin' } });
-            }
-            return res.status(401).json({ message: 'Usuario no encontrado' });
-        }
-        
-        const user = result.rows[0];
-        const validPass = await bcrypt.compare(password, user.password);
-        if (!validPass) return res.status(401).json({ message: 'Contraseña incorrecta' });
-
-        const token = jwt.sign({ id: user.id, nombre: user.nombre, role: user.role }, process.env.JWT_SECRET);
-        res.json({ token, user: { nombre: user.nombre, role: user.role } });
-
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/auth/register', async (req, res) => {
-    const { nombre, email, password } = req.body;
-    try {
-        const hash = await bcrypt.hash(password, 10);
-        await pool.query('INSERT INTO usuarios (nombre, email, password, role) VALUES ($1, $2, $3, $4)', 
-            [nombre, email, hash, 'user']);
-        res.json({ message: 'Usuario registrado correctamente' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-
-// --- RUTAS DEL SISTEMA SOLAR (Lo que necesita tu Dashboard) ---
-
-// A. Recibir datos del ESP32 o Simulador
-app.post('/api/solar/log', async (req, res) => {
-    const { voltaje, corriente, temperatura, bateria_nivel } = req.body;
-    console.log(`📡 Dato recibido: ${voltaje}V, ${temperatura}°C`);
-
-    try {
-        await pool.query(
-            'INSERT INTO mediciones (voltaje, corriente, temperatura, bateria_nivel) VALUES ($1, $2, $3, $4)',
-            [voltaje, corriente, temperatura, bateria_nivel]
-        );
-        
-        // Lógica simple de alerta para devolver al ESP32
-        const orden_apagado = temperatura > 50; 
-        res.json({ status: 'ok', orden_apagado });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Error guardando en DB' });
-    }
-});
-
-// B. Obtener el dato más reciente (Para las tarjetas)
-app.get('/api/solar/latest', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM mediciones ORDER BY fecha_registro DESC LIMIT 1');
-        res.json(result.rows[0] || {});
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// C. Obtener historial para la gráfica (¡ESTA ES LA RUTA QUE TE FALTABA!)
-app.get('/api/solar/history', async (req, res) => {
-    try {
-        // Traemos los últimos 20 registros
-        const result = await pool.query('SELECT * FROM mediciones ORDER BY fecha_registro DESC LIMIT 20');
+        const result = await pool.query('SELECT id, nombre, email, rol FROM usuarios');
         res.json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al obtener usuarios' });
     }
 });
 
-// Iniciar servidor
+// Cambiar rol de usuario
+app.put('/api/users/:id/role', async (req, res) => {
+    const { role } = req.body;
+    const { id } = req.params;
+    try {
+        await pool.query('UPDATE usuarios SET rol = $1 WHERE id = $2', [role, id]);
+        res.json({ message: 'Rol actualizado correctamente' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al actualizar rol' });
+    }
+});
+
+// Eliminar usuario
+app.delete('/api/users/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM usuarios WHERE id = $1', [req.params.id]);
+        res.json({ message: 'Usuario eliminado correctamente' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al eliminar usuario' });
+    }
+});
+
+
+// --- 3. RUTAS DEL SISTEMA SOLAR ---
+app.post('/api/solar/log', sensorController.logSolarData);
+app.get('/api/solar/latest', sensorController.getLatestData);
+app.get('/api/solar/history', sensorController.getHistory);
+
+// --- 4. COMANDOS PARA EL ESP32 --- // <--- NUEVO BLOQUE
+// Variable en memoria para guardar el comando pendiente
+let comandoPendiente = null; 
+
+// Endpoint para que el Frontend envíe la orden (ej: 'RESTART')
+app.post('/api/solar/command', (req, res) => {
+    comandoPendiente = req.body.command; 
+    console.log("📡 Comando recibido para ESP32:", comandoPendiente);
+    res.json({ status: 'queued', command: comandoPendiente });
+});
+
+// (OPCIONAL) Endpoint para que el ESP32 pregunte si hay comandos
+// El ESP32 debería llamar a esto periódicamente
+app.get('/api/solar/command', (req, res) => {
+    if (comandoPendiente) {
+        res.json({ command: comandoPendiente });
+        console.log("🚀 Comando enviado al ESP32:", comandoPendiente);
+        comandoPendiente = null; // Limpiamos el comando tras enviarlo
+    } else {
+        res.json({ command: null });
+    }
+});
+
+
+// --- INICIAR SERVIDOR ---
 app.listen(port, () => {
     console.log(`⚡ Servidor Backend corriendo en http://localhost:${port}`);
 });
